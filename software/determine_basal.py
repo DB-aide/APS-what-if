@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-07-23 14:22'
+    echo_msg['determine_basal.py'] = '2024-11-02 00:51'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -2176,7 +2176,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
             SMBInterval = SMBInterval * 60
             #//console_error(naive_eventualBG, insulinReq, worstCaseInsulinReq, durationReq);
             console_error("naive_eventualBG "+str(naive_eventualBG)+", "+str(durationReq)+"m "+str(smbLowTempReq)+"U/h temp needed; last bolus "+str(short(round(lastBolusAge/60,1)))+"m ago; maxBolus:", maxBolus)
-            if (lastBolusAge > SMBInterval - 6) :     #// 6s tolerance
+            if (lastBolusAge > SMBInterval - 12) :     #// to be 6s tolerance but released as 12s
                 if (microBolus > 0) :
                     rT['units'] = microBolus
                     rT['reason'] += "Microbolusing " + str(short(microBolus)) + "U. "
