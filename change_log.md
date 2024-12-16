@@ -1,5 +1,5 @@
-31.Aug.204
-==========
+31.Aug.2024
+===========
 Adapted to read the new AAPS3.3-dev logfile format. That format may change as long as 3.3 is in dev state.
 Documentation
 - Libre Office proforma now has macros for importing CSV file and generating the standard plots from the CSV file.
