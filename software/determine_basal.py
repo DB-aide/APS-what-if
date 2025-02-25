@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2025-02-15 23:55'
+    echo_msg['determine_basal.py'] = '2025-02-25 22:45'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -213,6 +213,17 @@ def enable_smb(profile, microBolusAllowed, meal_data, target_bg, Flows) :
     return False
 
 def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flows):
+    iobThUser = profile['iob_threshold_percent']
+    if ( useIobTh ) :
+        iobThPercent = round(iobThEffective/profile['max_iob']*100.0, 0)
+        if ( iobThPercent == iobThUser ) :
+            console_error("User setting iobTH="+str(iobThUser)+"% not modulated")
+        else :
+            console_error("User setting iobTH="+str(iobThUser)+"% modulated to "+str(short(round(iobThPercent,2)))+"% or "+str(short(round(iobThEffective,2)))+"U")
+            console_error("due to profile %, exercise mode or similar")
+    else :
+        console_error("User setting iobTH=100% disables iobTH method")
+        
     if ( not microBolusAllowed ) :
         return "AAPS"                                                  #// see message in enable_smb
     gz_proto = 'full_basal_exercise_target' in profile
@@ -238,17 +249,6 @@ def loop_smb(microBolusAllowed, profile, iob_data, useIobTh, iobThEffective, Flo
         else:
             msgEven    = "odd"
 
-        iobThUser = profile['iob_threshold_percent']
-        if ( useIobTh ) :
-            iobThPercent = round(iobThEffective/profile['max_iob']*100.0, 0)
-            if ( iobThPercent == iobThUser ) :
-                console_error("User setting iobTH="+str(iobThUser)+"% not modulated")
-            else :
-                console_error("User setting iobTH="+str(iobThUser)+"% modulated to "+str(short(round(iobThPercent,2)))+"% or "+str(short(round(iobThEffective,2)))+"U")
-                console_error("due to profile %, exercise mode or similar")
-        else :
-            console_error("User setting iobTH=100% disables iobTH method")
-        
         if not evenTarget:
             console_error("SMB disabled; current target " +str(target) +msgUnits +msgEven +msgTail)
             console_error("Loop allows minimal power")
