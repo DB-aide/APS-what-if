@@ -10,7 +10,7 @@ import copy
 #import setTempBasal as tempBasalFunctions
 
 def get_version_determine_basal(echo_msg):
-    echo_msg['determine_basal.py'] = '2024-11-02 00:51'
+    echo_msg['determine_basal.py'] = '2025-02-15 23:55'
     return echo_msg
 
 def round_basal(value, dummy) :
@@ -103,7 +103,7 @@ def reason(rT, msg) :
     rT['reason']  = '' + msg
   console_error(msg)
 
-def getMaxSafeBasal(profile):       #tempBasalFunctions.getMaxSafeBasal = function getMaxSafeBasal(profile) {
+def getMaxSafeBasal(profile):       #tempBasalFunctions.getMaxSafeBa0sal = function getMaxSafeBasal(profile) {
     if 'max_daily_safety_multiplier' in profile:
         max_daily_safety_multiplier = profile['max_daily_safety_multiplier']
     else:
@@ -629,12 +629,23 @@ def activityMonitor(profile, bg, target_bg, thisTime, utcOffset):
         activityDetection = profile['key_activity_detection']   # earlier implementation
     else:
         return 1                                                # older logfile from pre-activity times
-    
-    recentSteps5Minutes  = profile['recentSteps5Minutes']
-    recentSteps10Minutes = profile['recentSteps10Minutes']
-    recentSteps15Minutes = profile['recentSteps15Minutes']
-    recentSteps30Minutes = profile['recentSteps30Minutes']
-    recentSteps60Minutes = profile['recentSteps60Minutes']
+    if 'recentSteps5Minutes' in profile:
+        key05 = 'recentSteps5Minutes'
+        key10 = 'recentSteps10Minutes'
+        key15 = 'recentSteps15Minutes'
+        key30 = 'recentSteps30Minutes'
+        key60 = 'recentSteps60Minutes'
+    else:
+        key05 = 'recent_steps_5_minutes'
+        key10 = 'recent_steps_10_minutes'
+        key15 = 'recent_steps_15_minutes'
+        key30 = 'recent_steps_30_minutes'
+        key60 = 'recent_steps_60_minutes'
+    recentSteps5Minutes  = profile[key05]
+    recentSteps10Minutes = profile[key10]
+    recentSteps15Minutes = profile[key15]
+    recentSteps30Minutes = profile[key30]
+    recentSteps60Minutes = profile[key60]
     phoneMoved = profile['phone_moved']
     time_since_start = profile['time_since_start']
     activity_scale_factor = profile['activity_scale_factor']
@@ -2084,7 +2095,7 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                 elif  ( iob_data['iob'] > mealInsulinReq and iob_data['iob'] > 0 ) :
                     console_error("IOB",iob_data['iob'],"> COB "+str(meal_data['mealCOB'])+"; mealInsulinReq =",short(mealInsulinReq))
                     Flows.append(dict(title="IOB("+str(iob_data['iob'])+") covers\nmore than COB("+str(short(mealInsulinReq))+")\nlimit maxBolus to 30m basal", indent='+1', adr='1048+1'))
-                    if profile['maxUAMSMBBasalMinutes'] :
+                    if 'maxUAMSMBBasalMinutes' in profile and profile['maxUAMSMBBasalMinutes'] :
                         console_error("profile.maxUAMSMBBasalMinutes:",profile['maxUAMSMBBasalMinutes'],"profile.current_basal:",profile['current_basal'])
                         #// was: maxBolus = round( profile.current_basal  *  profile.maxUAMSMBBasalMinutes   / 60 ,1);
                         maxBolus = round(uplift * profile['current_basal'] * profile['maxUAMSMBBasalMinutes'] /60 ,1)  #### incl. GZ mod1: same as below
@@ -2104,7 +2115,10 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
                     #console_error("gz maximSMB: from currentBasal & maxSMBmBasalMinutes")                          #### incl. GZ mod1
                 #// bolus 1/2 the insulinReq, up to maxBolus, rounding down to nearest 0.1U
                 # was: microBolus = int(min(insulinReq/2,maxBolus)*10)/10                                           #### more courageos - I have no 2nd rig
-                bolus_increment = profile['bolus_increment']
+                if 'bolus_increment' in profile:
+                    bolus_increment = profile['bolus_increment']
+                else:
+                    bolus_increment = 0.1
             roundSMBTo = 1 / bolus_increment
             #was: microBolus = int(min(insulinReq * new_parameter['SMBRatio'], maxBolus)*10)/10                   #### incl. GZ mod2: master was 0.5
             #// gz md 10: make the share of InsulinReq a user input

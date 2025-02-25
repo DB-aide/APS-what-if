@@ -23,7 +23,7 @@ import determine_basal as detSMB
 from determine_basal import my_ce_file 
 
 def get_version_core(echo_msg):
-    echo_msg['emulator_core.py'] = '2024-08-11 19:53'
+    echo_msg['emulator_core.py'] = '2025-02-25 22:06'
     return echo_msg
 
 def hole(sLine, Ab, Auf, Zu):
@@ -343,13 +343,19 @@ def setVariant(stmp):
         if 'delta_ISFrange_weight' not in profile:
             profile['delta_ISFrange_weight'] = 0.0          ### not known                   after 3.0.1
         if 'enable_dura_ISF_with_COB' not in profile:
-            profile['enable_dura_ISF_with_COB'] = False     ### not known before without ai
+            profile['enable_dura_ISF_with_COB'] = True     ### not known before without ai
         #if 'activity_detection' not in profile and 'key_activity_detection' not in profile:
         #    profile['activity_detection'] = False       ### not known before without ai
+        if 'key_activity_detection' in profile:         ###very earlyimplementation
+            profile['activity_scale_factor'] = 1.0
+            profile['inactivity_scale_factor'] = 1.0
+            profile['ignore_inactivity_overnight'] = True
+            profile['inactivity_idle_start'] = 3
+            profile['inactivity_idle_end'] = 9
         if 'activity_detection' in profile and profile['activity_detection']:
             if 'activity_weight' in profile:
-                profile['activity_scale_factor'] = profile['activity_weight' ]
-                profile['inactivity_scale_factor'] = profile['inactivity_weight' ]
+                profile['activity_scale_factor'] = profile['activity_weight']
+                profile['inactivity_scale_factor'] = profile['inactivity_weight']
             if 'nightly_inactivity_detection' in profile:
                 profile['ignore_inactivity_overnight'] = profile['nightly_inactivity_detection']
             if 'ignore_inactivity_overnight' not in profile:
@@ -628,7 +634,8 @@ def extractResultComponent(st, key, keyStart, keyEnd):
 def TreatLoop33(st, log, lcount, fn):
     if not newLoop: return
     global utcOffset
-    utcOffset = extractResultComponent(st, 'utcOffset', '=', ',')
+    utcOffsetStr = extractResultComponent(st, 'utcOffset', '=', ',')
+    utcOffset = eval(utcOffsetStr[1:-1]+'/3600000')
     get_currenttemp(  lcount, extractResultComponent(st, 'currentTempJson', '{', '}'))
     get_iob_data(     lcount, extractResultComponent(st, 'iobDataJson', '[', ']'), log, st[:8] )
     get_profile(      lcount, extractResultComponent(st, 'profileJson', '{', '}'))
@@ -743,7 +750,10 @@ def TreatLoop(Curly, log, lcount, fn):
         reason = suggest['reason']
         if 'carbsReq' in suggest:
             CarbReqGram = str(suggest['carbsReq'])
-            CarbReqTime = str(suggest['carbsReqWithin'])
+            if 'carbsReqWithin' in suggest:
+                CarbReqTime = str(suggest['carbsReqWithin'])
+            else:
+                CarbReqTime = ' '
             lastCOB = hole(reason, 1, ' ', ',')[:-1]                #drop trailing COMMA
         else:
             CarbReqGram = ' '
@@ -2228,6 +2238,8 @@ def XYplots(loopCount, head1, head2, entries) :
                             SMBsource = ''
                             axbg.plot([0,0], [0,0], linestyle='dashed', color='grey', label='...')# inactive, i.e. off screen; placeholder for legend
         
+                        for el in Fcasts:
+                            print(loop_label[iFrame], el)
                         if 'COB' in Fcasts:                                                 # assume same logic as in original
                             origCOB = Fcasts['COB']                                         # the original array from logfile
                             initCOB = Fcasts['COBinitBGs']                                  # the emulated array before cleanup
