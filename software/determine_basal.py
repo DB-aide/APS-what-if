@@ -2316,4 +2316,3 @@ def determine_basal(glucose_status, currenttemp, iob_data, profile, autosens_dat
         #eturn tempBasalFunctions.setTempBasal(rate, 30, profile, rT, currenttemp)
         Flows.append(dict(title="required temp("+str(rate)+")\n> existing temp("+long2(currenttemp['rate'])+")", indent='0', adr='1140+12'))
         return                    setTempBasal(rate, 30, profile, rT, currenttemp, Flows)
-

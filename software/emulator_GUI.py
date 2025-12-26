@@ -1,4 +1,13 @@
 import  os, sys
+if sys.platform == "linux":
+    bashrc = os.path.expanduser("~/.bashrc")
+    line = "export PYTHONUTF8=1\n"
+
+    with open(bashrc, "a") as f:
+        f.write("\n" + line)
+
+    print("PYTHONUTF8=1 toegevoegd aan ~/.bashrc")
+
 import  glob
 #from Lib import subprocess
 import  contextlib
@@ -21,8 +30,6 @@ def get_version_GUI(echo_msg):
     echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
-
-
 
 #################################################################################
 #   overall layout                                                              #
@@ -808,7 +815,27 @@ def sub_emul():
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
-        loopInterval, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        # _, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+        _raw = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
+
+        if not isinstance(_raw, (list, tuple)):
+            sub_issue(f"parameters_known returned non-iterable: {_raw}")
+            _raw = [_raw]
+
+        _expected = 7
+        _defaults = [0, 'Z', 0, '', '', 0, '']
+
+        if len(_raw) < _expected:
+            sub_issue(f"parameters_known returned {len(_raw)} values, expected 7. Filling with defaults.")
+            _raw = list(_raw) + _defaults[len(_raw):]
+
+        if len(_raw) > _expected:
+            sub_issue(f"parameters_known returned {len(_raw)} values, ignoring extra values.")
+
+        _raw = _raw[:_expected]
+
+        _, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = _raw
+
         if thisTime == 'SYNTAX':
             runState.set('Emulation halted ... ')
             ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
