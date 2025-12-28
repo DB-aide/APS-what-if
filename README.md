@@ -1,3 +1,5 @@
+This version has been modified and tested with Debian 13.
+
 This branch is targeted at AAPS3.3.3.0 and the previously planned release for AAPS3.3.2 version is discontinued.
 The emulator documentation is not yet updated. Major changes are:
 - include the AAPS 3.2.0.4 capabilities
