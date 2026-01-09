@@ -9,23 +9,21 @@ if sys.platform == "linux":
     print("PYTHONUTF8=1 toegevoegd aan ~/.bashrc")
 
 import  glob
-#from Lib import subprocess
-import  contextlib
-import  io
 import  traceback
 from datetime import datetime
+import subprocess
 
-from tkinter import *
+from tkinter import Tk, StringVar, Text, VERTICAL, HORIZONTAL, W, E, S, N
 from tkinter import ttk
 from tkinter import filedialog
 from tkinter import messagebox
 
 from emulator_core import parameters_known
 from emulator_core import set_tty
-from emulator_core import log_msg, sub_issue
+from emulator_core import sub_issue
 
 from emulator_core import get_version_core
-from determine_basal    import get_version_determine_basal
+from determine_basal import get_version_determine_basal
 def get_version_GUI(echo_msg):
     echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
@@ -83,14 +81,15 @@ wdframe.columnconfigure(0, weight=1)
 wdframe.columnconfigure(1, weight=1)
 
 def get_wdir():
-    oldwd = wdir.get()
-    newwd = filedialog.askdirectory(initialdir=oldwd)
+    # always start the directory browser in the default working directory
+    newwd = filedialog.askdirectory(initialdir=default_wdir)
     if newwd != "":
         wdir.set(newwd)
 
 def reset_all():
     # input frame
-    wdir.set('')
+    global default_wdir
+    wdir.set(default_wdir)
     vfil.set('')
     afil.set('')
 
@@ -127,7 +126,33 @@ def gui_quit():
         sys.exit                                                                # from python
 
 ttk.Label(wdframe, text="Your working directory").grid(column=0, columnspan=3, row=0, sticky=(W,E), padx=5)
+# set a sensible default working directory (preferred: project subfolder)
 wdir = StringVar()
+try:
+    script_dir = os.path.dirname(os.path.abspath(__file__)) or os.getcwd()
+except Exception:
+    script_dir = os.getcwd()
+
+# preferred extra directory: create a subfolder in the script directory
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+extra_dir = os.path.join(project_root, 'your_working_directory')
+try:
+    os.makedirs(extra_dir, exist_ok=True)
+    default_wdir = extra_dir
+except Exception:
+    default_wdir = script_dir
+
+wdir.set(default_wdir)
+# prepare aapsLogs folder for AAPS log files under project root (create if missing)
+# project root is parent of the script directory
+project_root = os.path.abspath(os.path.join(script_dir, '..'))
+aaps_logs_dir = os.path.join(project_root, 'aapsLogs')
+try:
+    os.makedirs(aaps_logs_dir, exist_ok=True)
+except Exception:
+    aaps_logs_dir = default_wdir
+# default pattern for zip files in aapsLogs
+default_afil = os.path.join(aaps_logs_dir, '*.zip')
 wdir_entry = ttk.Entry(wdframe, width=100, textvariable=wdir)
 wdir_entry.grid(column=0, columnspan=3, row=1, sticky=(W, E), padx=5)
 
@@ -146,20 +171,25 @@ root.protocol("WM_DELETE_WINDOW", gui_quit)
 #################################################################################
 #   select the variant definition file  -----------------------------------------
 def get_vfil():
-    oldvf = vfil.get()
-    newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=wdir.get())
+    newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=default_wdir)
     if newvf != "":
         vfil.set(newvf)
 
 def edit_vfil():
     oldvf = vfil.get()
-    os.startfile(oldvf)                                                         # requires DOS knows to edit ".dat" files
+    open_file(oldvf)
 
 inpframe.columnconfigure(0, weight=1)
 inpframe.columnconfigure(1, weight=1)
 vfilRow = 3
 ttk.Label(inpframe, text="\nYour variant definition file").grid(column=0, columnspan=2, row=vfilRow-1, sticky=(W), padx=5)
 vfil = StringVar()
+try:
+    demo_path = os.path.abspath(os.path.join(script_dir, '..', 'Demo_Sports_Adaptations.vdf'))
+except Exception:
+    demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
+if os.path.exists(demo_path):
+    vfil.set(demo_path)
 vfil_entry = ttk.Entry(inpframe, width=100, textvariable=vfil)
 vfil_entry.grid(column=0, columnspan=2, row=vfilRow, sticky=(W,E), padx=5)
 
@@ -168,9 +198,11 @@ ttk.Button(inpframe, text="Edit",   command=edit_vfil).grid(column=3, row=vfilRo
 
 #   select the AAPS logfile(s)  -------------------------------------------------
 def get_afil():
-    oldaf = afil.get()
     loglist = {'logs {.zip .0 .1 .2 .3 .4 .5 .6 .7 .8 .9 .10 .11 .12 .13 .14 .15 .16}'}  # my own max was 11 !!
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get())
+    # start in the aapsLogs folder (fallback to default_wdir)
+    startdir = aaps_logs_dir if os.path.exists(aaps_logs_dir) else default_wdir
+    initialfile = os.path.basename(default_afil) if default_afil else '*.zip'
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=startdir, initialfile=initialfile)
     if newaf != "":
         afil.set(newaf)
 
@@ -180,9 +212,9 @@ def show_afil():
         msg = "No wild card match specified.\nInsert '*' or '?' at the appropriate position"
     else:
         msg = ""
-        logListe = glob.glob(newaf, recursive=False)                            # the wild card match
+        log_liste = glob.glob(newaf, recursive=False)                            # the wild card match
         filecount = 0
-        for fn in logListe:
+        for fn in log_liste:
             ftype = fn[len(fn)-3:]
             if ftype=='zip' or ftype.find(".")>=0:
                 msg += os.path.basename(fn) + "\n"
@@ -193,17 +225,21 @@ def show_afil():
 afilRow = 5
 ttk.Label(inpframe, text="\nYour AAPS logfile(s)").grid(column=0, columnspan=2, row=afilRow-1, sticky=(E), padx=5)
 afil = StringVar()
+if 'default_afil' in globals() and default_afil:
+    afil.set(default_afil)
 afil_entry = ttk.Entry(inpframe, width=100, textvariable=afil, justify='right')
 afil_entry.grid(column=0, columnspan=2, row=afilRow, sticky=(W,E), padx=5)
 
 ttk.Button(inpframe, text="Browse", command=get_afil).grid( column=2, row=afilRow, sticky=(W, E), padx=10)
 ttk.Button(inpframe, text="Show matches", command=show_afil).grid( column=3, row=afilRow, sticky=(W, E), padx=10)
 
-#   select the optional start and end date/time     -----------------------------
+# select the optional start and end date/time     -----------------------------
+ENABLED = '!disabled'
+
 def stmpStartChanged():
     if stmpStart.get() == 'yes':
-        tstart_entry.state(['!disabled'])
-        chkStopp.state(['!disabled'])
+        tstart_entry.state([ENABLED])
+        chkStopp.state([ENABLED])
     else:
         tstart_entry.state(['disabled'])
         tstopp_entry.state(['disabled'])
@@ -211,7 +247,7 @@ def stmpStartChanged():
 
 def stmpStoppChanged():
     if stmpStopp.get() == 'yes':
-        tstopp_entry.state(['!disabled'])
+        tstopp_entry.state([ENABLED])
     else:
         tstopp_entry.state(['disabled'])
     
@@ -221,27 +257,29 @@ noStopp = '2099-12-31T23:59:59Z'
 ttk.Label(inpframe, text="\nexample date/time format ...   2019-11-06T12:30:00Z   ").grid(column=1, row=tstartRow-1, sticky=(E), padx=5)
 
 stmpStart = StringVar()
-stmpStart.set('no')                                                             #was in tri-state
+stmpStart.set('yes')                                                             # was in tri-state
 chkStart  = ttk.Checkbutton(inpframe, text='  Use start time by entering UTC date/time', \
             command=stmpStartChanged, variable=stmpStart, onvalue='yes', offvalue='no')
 chkStart.grid(column=0, row=tstartRow, sticky=(W), padx=5)
 tstart = StringVar()
 tstart_entry = ttk.Entry(inpframe, width=20, textvariable=tstart)
 tstart_entry.grid(column=1, row=tstartRow, sticky=(E), padx=5, pady=0)
-tstart_entry.state(['disabled'])                                                # initially OFF
 tstart.set(noStart)
 
 stmpStopp = StringVar()
-stmpStopp.set('no')                                                             #was in tri-state
-chkStopp  = ttk.Checkbutton(inpframe, text='  Use final time by entering UTC date/time', \
-            command=stmpStoppChanged, variable=stmpStopp, onvalue='yes', offvalue='no')
-chkStopp.grid(column=0, row=tstartRow+1, sticky=(W), padx=5)
+stmpStopp.set('yes')                                                             # was in tri-state
 tstopp = StringVar()
 tstopp_entry = ttk.Entry(inpframe, width=20, textvariable=tstopp)
 tstopp_entry.grid(column=1, row=tstartRow+1, sticky=(E), padx=5, pady=5)
-tstopp_entry.state(['disabled'])                                                # initially OFF
-chkStopp.state(['disabled'])                                                    # initially OFF
+tstopp_entry.state(['!disabled'])
+chkStopp  = ttk.Checkbutton(inpframe, text='  Use final time by entering UTC date/time', \
+            command=stmpStoppChanged, variable=stmpStopp, onvalue='yes', offvalue='no')
+chkStopp.grid(column=0, row=tstartRow+1, sticky=(W), padx=5)
+tstopp_entry.state(['!disabled'])
 tstopp.set(noStopp)
+# initialize start/stop entry states according to variables
+stmpStartChanged()
+stmpStoppChanged()
 
 
 #################################################################################
@@ -560,49 +598,71 @@ all.grid( column=2, row=13, columnspan=3, padx=20, sticky=W)
 def get_logfil():
     oldaf = logfil.get()
     loglist = {'logfile {.log}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         logfil.set(newaf)
+
+def open_file(path):
+    if not path:
+        messagebox.showerror(message='No file specified to open', title='Open file')
+        return
+    if not os.path.exists(path):
+        messagebox.showerror(message=f'File not found:\n{path}', title='Open file')
+        return
+    try:
+        if sys.platform.startswith('win'):
+            os.startfile(path)
+        elif sys.platform == 'darwin':
+            subprocess.Popen(['open', path])
+        else:
+            subprocess.Popen(['xdg-open', path])
+    except Exception:
+        tb = sys.exc_info()[2]
+        sub_issue('Problem opening file')
+        for ele in traceback.format_tb(tb):
+            sub_issue(ele[:-1])
+        sub_issue(str(sys.exc_info()[1]))
+        messagebox.showerror(message=f'Unable to open file:\n{path}', title='Open file')
 
 def get_deltafil():
     oldaf = deltafil.get()
     loglist = {'deltafile {.delta}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         deltafil.set(newaf)
 
 def get_tabfil():
     oldaf = tabfil.get()
     loglist = {'table {.csv .tab}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         tabfil.set(newaf)
 
 def get_txtorig():
     oldaf = txtorig.get()
     loglist = {'orig_log {.orig.txt}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         txtorig.set(newaf)
 
 def get_txtemul():
     oldaf = txtemul.get()
     loglist = {'emul_log {.txt}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         txtemul.set(newaf)
 
 def get_pdffil():
     oldaf = pdffil.get()
     loglist = {'graphics {.pdf .jpg}'}  
-    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=wdir.get(), initialfile=oldaf)
+    newaf = filedialog.askopenfilename(filetypes=loglist, initialdir=default_wdir, initialfile=oldaf)
     if newaf != "":
         pdffil.set(newaf)
 
 def edit_logfil():
     oldvf = logfil.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -614,7 +674,7 @@ def edit_logfil():
 def edit_deltafil():
     oldvf = deltafil.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".delta" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -626,7 +686,7 @@ def edit_deltafil():
 def edit_tabfil():
     oldvf = tabfil.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".csv" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -638,7 +698,7 @@ def edit_tabfil():
 def edit_txtorig():
     oldvf = txtorig.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -650,7 +710,7 @@ def edit_txtorig():
 def edit_txtemul():
     oldvf = txtemul.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to edit ".log" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -662,7 +722,7 @@ def edit_txtemul():
 def edit_pdffil():
     oldvf = pdffil.get()
     try:
-        os.startfile(oldvf)                                                     # requires DOS knows to open ".pdf" files
+        open_file(oldvf)
     except:                                                                     # catch *all* exceptions
         book.select(4)                                                          # activate result tab
         tb = sys.exc_info()[2]
@@ -849,13 +909,13 @@ def sub_emul():
 
             # load result filenames into resframe
             newaf = afil.get()
-            logListe = glob.glob(newaf, recursive=False)                        # the wild card match
-            filecount = 0
-            for fn in logListe:
+            log_liste = glob.glob(newaf, recursive=False)                        # the wild card match
+
+            for fn in log_liste:
                 #log_msg("checking result file "+fn)
                 ftype = fn[len(fn)-3:]
                 #fn_first = wdir.get() + '/' + os.path.basename(fn)
-                varLabel = variant[:-4]
+
                 if ftype=='zip' or ftype.find(".")>=0:
                     logfil.set(fn_first+'.'+variant[:-4]+'.log')
                     tabfil.set(fn_first+'.'+variant[:-4]+'.csv')
@@ -911,5 +971,4 @@ how_to_print = 'GUI'
 set_tty(runframe, lfd, how_to_print)                                            # export print settings to main routine
 
 wdir_entry.focus()                                                              # activate as initial input box
-while True:
-    root.mainloop()                                                             # was sometimes broken on return from parmeters_known or matplotlib, respectively
+root.mainloop()
