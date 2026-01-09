@@ -24,6 +24,9 @@ from emulator_core import sub_issue
 
 from emulator_core import get_version_core
 from determine_basal import get_version_determine_basal
+from config import DEFAULT_WDIR, AAPS_LOGS_DIR, DEFAULT_AAPS_ZIP_PATTERN, VARYHOME
+from pathlib import Path
+
 def get_version_GUI(echo_msg):
     echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
@@ -88,19 +91,16 @@ def get_wdir():
 
 def reset_all():
     # input frame
-    global default_wdir
-    wdir.set(default_wdir)
-    vfil.set('')
-    afil.set('')
+    wdir.set(str(DEFAULT_WDIR))
 
-    stmpStart.set('no')
-    tstart_entry.state(['disabled'])                                                # initially OFF
+    stmpStart.set('yes')
+    tstart_entry.state(['!disabled'])
     tstart.set(noStart)
 
-    stmpStopp.set('no')
+    stmpStopp.set('yes')
     tstopp.set(noStopp)
-    tstopp_entry.state(['disabled'])                                                # initially OFF
-    chkStopp.state(['disabled'])                                                    # initially OFF
+    tstopp_entry.state(['!disabled'])
+    chkStopp.state(['!disabled'])
 
     # variant frame
     radioMost()
@@ -108,14 +108,22 @@ def reset_all():
     # run frame
     runState.set(notRunning)
     clear_msg()
-    
-    # result frame
-    logfil.set('')
-    tabfil.set('')
-    deltafil.set('')
-    txtorig.set('')
-    txtemul.set('')
-    pdffil.set('')
+
+    # result frame – everything back to DEFAULT_WDIR
+    logfil.set(str(DEFAULT_WDIR))
+    tabfil.set(str(DEFAULT_WDIR))
+    deltafil.set(str(DEFAULT_WDIR))
+    txtorig.set(str(DEFAULT_WDIR))
+    txtemul.set(str(DEFAULT_WDIR))
+    pdffil.set(str(DEFAULT_WDIR))
+    vfil = StringVar()
+    try:
+        demo_path = os.path.abspath(os.path.join(script_dir, '..', 'Demo_Sports_Adaptations.vdf'))
+    except Exception:
+        demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
+    if os.path.exists(demo_path):
+        vfil.set(demo_path)
+
     
 def gui_quit():
     really = messagebox.askyesno(

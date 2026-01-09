@@ -22,7 +22,9 @@ import os
 import json
 
 import determine_basal as detSMB
-from determine_basal import my_ce_file 
+from determine_basal import my_ce_file
+from config import DEFAULT_WDIR
+from pathlib import Path
 
 # Parser debug logging (set to True to enable)
 parser_debug = True
