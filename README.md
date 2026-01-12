@@ -1,36 +1,106 @@
-This branch is targeted at AAPS3.3.3.0 and the previously planned release for AAPS3.3.2 version is discontinued.
-The emulator documentation is not yet updated. Major changes are:
-- include the AAPS 3.2.0.4 capabilities
-- support for AAPS 3.3.3.x version
-- include recent big fixes from AutoISF version 3.0.3
-- include the new autoISF3.1.0 capabilities
+APS Emulator (Debian / Linux ready)
 
-This branch is not yet fully tested and may contain bugs. In such cases please contact ga-zelle.
+This version has been modified and tested on Debian 13 (Linux).
 
-See also the change.log
+This branch targets AAPS 3.3.3.0.
+The previously planned release for AAPS 3.3.2 is discontinued.
 
-# APS-emulator
+⚠️ The emulator documentation is not yet fully updated.
 
-I translated the original java-script code of "determineSMB-basal.js" into python and can run it on a PC. 
-This allows me to untertake a time tarvel back to any time slot and see how insulin delivery 
-would have differed with different APS settings. This offers a safe method to play with settings 
-and check their impact before actually adapting them in APS itself.
+Major changes in this branch
+Includes AAPS 3.2.0.4 capabilities
+Full support for AAPS 3.3.3.x
+Includes recent bug fixes from AutoISF 3.0.3
+Includes the new autoISF 3.1.0 capabilities
 
-The historical logfiles contain enough information to rerun the APS loop, but with modified settings like
-- changed target
-- changed ISF
-- SMB on/off
-- ...
+This branch is not yet fully tested and may still contain bugs.
+If you encounter issues, please contact ga-zelle.
 
-The main result in tabular and graphical output is the change in insulin required and the related SMB and TBR. 
-Related data like SGV, target, Autosens ratio etc. are also shown.
+See also: change.log
+What is this emulator?
 
-A special output is the flowchart which helps to understand the logic flow through the loop. This is the 
-track which statements in "determineSMB-basal" were executed and which not together with the reasoning 
-of those decisions taken from the original code.
+APS-emulator is a Python translation of the original JavaScript code
+determineSMB-basal.js.
+It allows running the APS loop offline on a PC, using historical AAPS log files.
 
-# Latest major change
-There is a new release called QPythonPlus required for Android14 and above which allows running the emulator on phones. 
-With older Android versions the previous qpython 3L / 3S still work, even with these updated scripts.
+This makes it possible to:
+Travel back in time to any moment in a logfile
+Re-run the APS loop with modified settings
+Safely evaluate changes before applying them in AAPS itself
+This provides a safe and reproducible environment to experiment with APS settings.
 
-For downloading the Android14+ version go to https://drive.google.com/drive/u/3/folders/1lFqvlmArrV35ikcdW61MdVAx2UUWMcLh 
+What can be modified?
+The historical AAPS log files contain enough information to re-run the APS loop with, for example:
+Changed glucose target
+Changed ISF
+SMB on / off
+Different autosens behavior
+Other APS-related parameters
+Output and results
+
+The emulator produces:
+Tabular output (CSV / TXT)
+Graphical output (PDF)
+Delta analysis of insulin differences
+Main results include:
+Difference in total insulin delivery
+SMB and TBR changes
+
+Related values such as:
+SGV
+target
+autosens ratio
+IOB, COB, etc.
+Flowchart output (logic tracing)
+
+A special output is the flowchart view, which visualizes:
+
+The execution path through determineSMB-basal
+Which decisions were taken
+Which branches were skipped
+The reasoning behind each decision
+This is extremely useful to understand why APS behaved the way it did.
+
+Linux / Debian usage (recommended)
+This project works best on Linux / Debian.
+Directory usage
+
+aapsLogs/
+→ Input directory
+→ Copy AAPS .zip log files here (from your phone)
+
+your_working_directory/
+→ Output directory
+→ Generated emulator results (CSV, PDF, TXT, etc.)
+
+All paths are configured in:
+
+software/config.py
+Android usage (optional)
+Running the emulator directly on Android is optional.
+
+A new app called QPythonPlus is required for Android 14 and above.
+Older Android versions can still use QPython 3L / 3S, even with these updated scripts.
+
+Download QPythonPlus (Android 14+):
+https://drive.google.com/drive/u/3/folders/1lFqvlmArrV35ikcdW61MdVAx2UUWMcLh
+
+⚠️ On Linux / PC, Android path detection is disabled by default.
+Users are expected to manually copy log files from the phone to aapsLogs/.
+
+Important notes for Git users
+Do not commit:
+aapsLogs/
+your_working_directory/
+These directories contain large generated files and are ignored by .gitignore
+Only source code and documentation should be committed
+
+Status
+
+✅ Debian 13 tested
+
+⚠️ Documentation still evolving
+
+⚠️ Not fully regression-tested
+
+🧪 Intended for advanced users who understand AAPS behavior
