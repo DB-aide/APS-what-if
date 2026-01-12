@@ -1,2 +1,0 @@
-AAPS scan from Demo_Sports_Adaptations for SMB comparison created on Sun, 11 Jan 2026 16:34:01 +0100
-FILE=/mnt/831eaeed-366e-4227-8611-577411edb9ca/Dries/backup/APS-what-if/software/aapsLogs/AndroidAPS._2025-12-28_00.log.zip

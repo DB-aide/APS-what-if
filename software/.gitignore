@@ -2,6 +2,8 @@
 # AAPS input logs (NEVER commit)
 # ===============================
 aapsLogs/
+/aapsLogs
+/aapsLogs/*.zip
 *.zip
 
 # ===============================
@@ -12,6 +14,11 @@ aapsLogs/
 *.log
 *.txt
 *.pdf
+/*.csv
+/*.delta
+/*.log
+/*.txt
+/*.pdf
 
 # ===============================
 # Python
