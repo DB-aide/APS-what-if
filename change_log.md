@@ -1,3 +1,28 @@
+12.Jan.2026
+-----------
+Error handling for the Manage Inputs and Outputs for Emulating AAPS Settings dialog. 
+If there are no *.zip files yet, a message will be displayed to the user.
+Dialog updated and folders are correct for all OS versions.
+The config.py file now contains the folder variables.
+And a new file i18n.py with error messages in it.
+
+APS-what-if/
+│
+├── config.py
+├── emulator_batch.py
+│
+├── aapsLogs/			←user pastes .zip logs here
+│   ├── AndroidAPS_....zip
+│
+├── your_working_directory/	←ALL output
+│   ├── *.orig.txt
+│   ├── *.csv
+│   ├── *.log
+│   ├── *.pdf
+│
+└── software/
+
+
 05.May.2025
 -----------
 Added handling of planned new AutoISF features

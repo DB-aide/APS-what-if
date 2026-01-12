@@ -1,61 +1,77 @@
-# config.py
-# Android paths do NOT belong in config.py!
+"""
+update by author: Dries Bakker (NL) With the help of ChatGTP
+File name: config.py
+
+Version: 1.0.0 12-01-2026 Now works well for Windows, Linux, Mac, and Android.
+
+"""
 
 from pathlib import Path
+import os
 
-# ===============================
-# Project directories
-# ===============================
+# ==================================================
+# Project root
+# ==================================================
 
-def get_project_root() -> Path:
-    """
-    Returns the project root directory.
-    Assumes config.py is located inside the project.
-    """
-    return Path(__file__).resolve().parent
+PROJECT_ROOT = Path(__file__).resolve().parent
 
+# ==================================================
+# Working directory (output from emulator)
+# ==================================================
+# This used to be often hardcoded → now os-proof
+DEFAULT_ROOT = os.getcwd()
+DEFAULT_WDIR = PROJECT_ROOT / "your_working_directory"
 
-def ensure_directories() -> dict:
-    """
-    Ensures all required directories exist.
-    Works on Linux, Windows, macOS.
-    Returns paths as Path objects.
-    """
+# ==================================================
+# AAPS log directories
+# ==================================================
 
-    project_root = get_project_root()
+# Standard Linux/PC logs
+AAPS_LOGS_DIR = PROJECT_ROOT / "aapsLogs"
 
-    paths = {
-        "PROJECT_ROOT": project_root,
-        "WORKING_DIR": project_root / "your_working_directory",
-        "AAPS_LOGS_DIR": project_root / "aapsLogs",
-    }
+# Android (NOT used automatically,
+# only available if the code explicitly requests it)
+ANDROID_AAPS_LOG_DIRS = [
+    Path("/storage/emulated/0/Documents/aapsLogs"),  # Android 11+
+]
 
-    for name, path in paths.items():
-        try:
-            path.mkdir(parents=True, exist_ok=True)
-            # print(f"[OK] Directory exists: {path}")
-        except Exception as e:
-            print(f"[ERROR] Cannot create {name}: {path} → {e}")
+# ==================================================
+# Ensure directories exist (safe)
+# ==================================================
 
-    return paths
+for d in (
+    DEFAULT_WDIR,
+    AAPS_LOGS_DIR,
+):
+    try:
+        d.mkdir(parents=True, exist_ok=True)
+    except Exception as e:
+        print(f"[config] Cannot create directory {d}: {e}")
 
-# ===============================
-# Initialize on import
-# ===============================
+# ==================================================
+# File patterns
+# ==================================================
 
-PATHS = ensure_directories()
-
-# Convenient shortcuts
-PROJECT_ROOT = PATHS["PROJECT_ROOT"]
-DEFAULT_WDIR = PATHS["WORKING_DIR"]
-AAPS_LOGS_DIR = PATHS["AAPS_LOGS_DIR"]
-VARYHOME = DEFAULT_WDIR
-
-# Alias voor oudere code
-WORKING_DIR = DEFAULT_WDIR
-
-# Default file patterns
 DEFAULT_AAPS_ZIP_PATTERN = AAPS_LOGS_DIR / "*.zip"
 
-# encoding safe. No more PYTHONUTF8 hacks needed!
+# ==================================================
+# Encoding safe. No more PYTHONUTF8 hacks needed!
+# ==================================================
+
 DEFAULT_ENCODING = "utf-8"
+
+# ==================================================
+# Compatibility aliases (IMPORTANT)
+# ==================================================
+# Some old code expects this name
+VARYHOME = DEFAULT_WDIR
+
+# ===============================
+# Platform behavior
+# ===============================
+
+# When True:
+#   - emulator_batch.py will try Android paths
+# When False (default):
+#   - always use AAPS_LOGS_DIR for input
+ENABLE_ANDROID_DETECTION = False

@@ -1,13 +1,12 @@
+"""
+Version 1.0.0 12-01-2026 Error handling for the Manage Inputs and Outputs for Emulating AAPS Settings dialog. 
+                         If there are no *.zip files yet, a message will be displayed to the user.
+                         Dialog updated and folders are correct for all OS versions.
+                         The config.py file now contains the folder variables.
+                         And a new file i18n.py with error messages in it.
+
+"""
 import  os, sys
-if sys.platform == "linux":
-    bashrc = os.path.expanduser("~/.bashrc")
-    line = "export PYTHONUTF8=1\n"
-
-    with open(bashrc, "a") as f:
-        f.write("\n" + line)
-
-    print("PYTHONUTF8=1 toegevoegd aan ~/.bashrc")
-
 import  glob
 import  traceback
 from datetime import datetime
@@ -24,13 +23,24 @@ from emulator_core import sub_issue
 
 from emulator_core import get_version_core
 from determine_basal import get_version_determine_basal
-from config import DEFAULT_WDIR, AAPS_LOGS_DIR, DEFAULT_AAPS_ZIP_PATTERN, VARYHOME
-from pathlib import Path
+from config import DEFAULT_WDIR, AAPS_LOGS_DIR, DEFAULT_AAPS_ZIP_PATTERN, DEFAULT_ROOT
+from i18n import _ # Error handling for the multilingual dialog.
+
+def check_aaps_logs_present():
+    if not list(AAPS_LOGS_DIR.glob("*.zip")):
+        messagebox.showerror(
+            _("no_logs_title"),
+            _("no_logs_msg", path=AAPS_LOGS_DIR)
+        )
+        return False
+    return True
 
 def get_version_GUI(echo_msg):
-    echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'        # align camelPrint of bestSlope with bestParabola
+    echo_msg['emulator_GUI.py'] = '2026-01-12 11:40'        # Dialog updated. And folders are correct for all OS versions. The config.py file now contains the folder variables.
+    #echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'       # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
+
 
 #################################################################################
 #   overall layout                                                              #
@@ -82,16 +92,21 @@ wdframe = ttk.Frame(root, padding="3 3 3 12", relief='raised')
 wdframe.grid(column=0, row=0, columnspan=4, sticky='WENS')
 wdframe.columnconfigure(0, weight=1)
 wdframe.columnconfigure(1, weight=1)
+wdir = StringVar()
 
 def get_wdir():
     # always start the directory browser in the default working directory
+    default_wdir = str(DEFAULT_WDIR)
+    wdir.set(default_wdir)
+
     newwd = filedialog.askdirectory(initialdir=default_wdir)
     if newwd != "":
         wdir.set(newwd)
 
 def reset_all():
     # input frame
-    wdir.set(str(DEFAULT_WDIR))
+    default_wdir = str(DEFAULT_WDIR)
+    wdir.set(default_wdir)
 
     stmpStart.set('yes')
     tstart_entry.state(['!disabled'])
@@ -118,10 +133,11 @@ def reset_all():
     pdffil.set(str(DEFAULT_WDIR))
     vfil = StringVar()
     try:
-        demo_path = os.path.abspath(os.path.join(script_dir, '..', 'Demo_Sports_Adaptations.vdf'))
+        demo_path = DEFAULT_ROOT
     except Exception:
-        demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
+        demo_path = DEFAULT_ROOT + os.sep + 'Demo_Sports_Adaptations.vdf'
     if os.path.exists(demo_path):
+        demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
         vfil.set(demo_path)
 
     
@@ -132,35 +148,12 @@ def gui_quit():
         root.destroy()
         exit()                                                                  # from tkinter
         sys.exit                                                                # from python
-
+        
 ttk.Label(wdframe, text="Your working directory").grid(column=0, columnspan=3, row=0, sticky=(W,E), padx=5)
-# set a sensible default working directory (preferred: project subfolder)
-wdir = StringVar()
-try:
-    script_dir = os.path.dirname(os.path.abspath(__file__)) or os.getcwd()
-except Exception:
-    script_dir = os.getcwd()
-
-# preferred extra directory: create a subfolder in the script directory
-project_root = os.path.abspath(os.path.join(script_dir, '..'))
-extra_dir = os.path.join(project_root, 'your_working_directory')
-try:
-    os.makedirs(extra_dir, exist_ok=True)
-    default_wdir = extra_dir
-except Exception:
-    default_wdir = script_dir
-
+default_wdir = str(DEFAULT_WDIR)
 wdir.set(default_wdir)
-# prepare aapsLogs folder for AAPS log files under project root (create if missing)
-# project root is parent of the script directory
-project_root = os.path.abspath(os.path.join(script_dir, '..'))
-aaps_logs_dir = os.path.join(project_root, 'aapsLogs')
-try:
-    os.makedirs(aaps_logs_dir, exist_ok=True)
-except Exception:
-    aaps_logs_dir = default_wdir
-# default pattern for zip files in aapsLogs
-default_afil = os.path.join(aaps_logs_dir, '*.zip')
+aaps_logs_dir = str(AAPS_LOGS_DIR)
+default_afil = str(DEFAULT_AAPS_ZIP_PATTERN)
 wdir_entry = ttk.Entry(wdframe, width=100, textvariable=wdir)
 wdir_entry.grid(column=0, columnspan=3, row=1, sticky=(W, E), padx=5)
 
@@ -171,15 +164,12 @@ ttk.Button(wdframe, text="Quit",   command=gui_quit, style='Exit.TButton').grid(
 # same as QUIT button so matplotlib is closed, too:
 root.protocol("WM_DELETE_WINDOW", gui_quit)
 
-
-
-
 #################################################################################
 #   inpframe:                                                                   #
 #################################################################################
 #   select the variant definition file  -----------------------------------------
 def get_vfil():
-    newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=default_wdir)
+    newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=DEFAULT_ROOT)
     if newvf != "":
         vfil.set(newvf)
 
@@ -193,7 +183,7 @@ vfilRow = 3
 ttk.Label(inpframe, text="\nYour variant definition file").grid(column=0, columnspan=2, row=vfilRow-1, sticky=(W), padx=5)
 vfil = StringVar()
 try:
-    demo_path = os.path.abspath(os.path.join(script_dir, '..', 'Demo_Sports_Adaptations.vdf'))
+    demo_path = DEFAULT_ROOT + os.sep + 'Demo_Sports_Adaptations.vdf'
 except Exception:
     demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
 if os.path.exists(demo_path):
@@ -240,6 +230,7 @@ afil_entry.grid(column=0, columnspan=2, row=afilRow, sticky=(W,E), padx=5)
 
 ttk.Button(inpframe, text="Browse", command=get_afil).grid( column=2, row=afilRow, sticky=(W, E), padx=10)
 ttk.Button(inpframe, text="Show matches", command=show_afil).grid( column=3, row=afilRow, sticky=(W, E), padx=10)
+
 
 # select the optional start and end date/time     -----------------------------
 ENABLED = '!disabled'
@@ -808,12 +799,15 @@ def echo_version(mdl):
 
 def sub_emul():
     global runState, varyHome
+    if not check_aaps_logs_present():
+        return
     runState.set('Checking inputs ...   ')
-    varyHome= sys.argv[0]                           # command used to start this script
-    whereColon = varyHome.find(':')
-    if whereColon < 0:
-        varyHome = os.getcwd()
-    varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
+    # varyHome= sys.argv[0]                           # command used to start this script
+    # whereColon = varyHome.find(':')
+    # if whereColon < 0:
+    #     varyHome = os.getcwd()
+    # varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
+    varyHome = DEFAULT_ROOT + os.sep
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
     m +='\n vary_settings home directory  ' + varyHome
     global echo_msg
@@ -828,8 +822,8 @@ def sub_emul():
     m += '\nLogfile(s) to scan    ' + afil.get()
 
     ttk.Label(runframe, textvariable=runState, style='TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-    incomplete = False                                                          # update frame display
-    variant = os.path.basename(vfil.get())
+    incomplete = False                                              # update frame display
+    variant = os.path.basename(vfil.get())                          # Get the file name for example: *.vdf
     if variant == '':
         sub_issue('variant definition file is missing')
         incomplete = True
@@ -838,7 +832,7 @@ def sub_emul():
         sub_issue('graphics output options are missing')
         incomplete = True
     m += '\nOutput options        ' + gopt
-    gopt = 'Windows/' + gopt                                                    # i.e. not in Android
+    gopt = sys.platform + "/" + gopt                                        # i.e. not in Android
     #m_default = ''
     #if gopt.find('.') >= 0 :
     #    my_decimal = '.'
@@ -879,6 +873,8 @@ def sub_emul():
         return                                                                  # no execution
 
     try:
+        if not check_aaps_logs_present():
+            return
         runState.set('Emulation started ...')
         runframe.update()                                                       # update frame display
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
@@ -920,9 +916,7 @@ def sub_emul():
             log_liste = glob.glob(newaf, recursive=False)                        # the wild card match
 
             for fn in log_liste:
-                #log_msg("checking result file "+fn)
                 ftype = fn[len(fn)-3:]
-                #fn_first = wdir.get() + '/' + os.path.basename(fn)
 
                 if ftype=='zip' or ftype.find(".")>=0:
                     logfil.set(fn_first+'.'+variant[:-4]+'.log')

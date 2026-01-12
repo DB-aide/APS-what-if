@@ -10,6 +10,7 @@ from emulator_core import set_tty
 
 from emulator_core import get_version_core
 from determine_basal    import get_version_determine_basal
+from config import DEFAULT_WDIR, AAPS_LOGS_DIR, ENABLE_ANDROID_DETECTION
 
 def get_version_batch(echo_msg):
     echo_msg['emulator_batch.py'] = '2025-05-27 14:00'      # fit table output for Qpython+; adapt VDF home
@@ -136,33 +137,38 @@ set_tty(0,        0,    how_to_print)            # export print settings to main
 
 global echo_msg
 
-# try whether we are on Android:
+# ==================================================
+# Platform detection (controlled via config.py)
+# ==================================================
 IsAndroid = False
-test_file = 'AndroidAPS.log'
 
-test_dir14= '/storage/emulated/0/Documents/aapsLogs/'
-inh14     = glob.glob(test_dir14+'*')            # for Android11+ using AAPS 3.3+
-if len(inh14) > 0:
-    IsAndroid = True
-    vdf_dir = test_dir14
-    fn = vdf_dir + test_file
-    print('gefunden:', fn)
-    
-test_dir10= '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'    # always find it even when starting new logfile
-inh10     = glob.glob(test_dir10+'*')            # for Android10 or less using AAPS 2.8.2
-if not IsAndroid and len(inh10) > 0:
-    IsAndroid = True
-    vdf_dir = test_dir10
-    fn = vdf_dir + test_file
-    print('gefunden:', fn)
+if ENABLE_ANDROID_DETECTION:
+    test_file = 'AndroidAPS.log'
 
-test_dir11= '/storage/emulated/0/AAPS/logs/info.nightscout.androidaps/'
-inh11     = glob.glob(test_dir11+'*')            # for Android11+ using AAPS 3.0+
-if not IsAndroid and len(inh11) > 0:
-    IsAndroid = True
-    vdf_dir = test_dir11
-    fn = vdf_dir + test_file
-    print('gefunden:', fn)
+    test_dir14 = '/storage/emulated/0/Documents/aapsLogs/'
+    inh14 = glob.glob(test_dir14 + '*')
+    if len(inh14) > 0:
+        IsAndroid = True
+        vdf_dir = test_dir14
+
+    test_dir10 = '/storage/emulated/0/Android/data/info.nightscout.androidaps/files/'
+    inh10 = glob.glob(test_dir10 + '*')
+    if not IsAndroid and len(inh10) > 0:
+        IsAndroid = True
+        vdf_dir = test_dir10
+
+    test_dir11 = '/storage/emulated/0/AAPS/logs/info.nightscout.androidaps/'
+    inh11 = glob.glob(test_dir11 + '*')
+    if not IsAndroid and len(inh11) > 0:
+        IsAndroid = True
+        vdf_dir = test_dir11
+
+# ==================================================
+# Force desktop/Linux behavior
+# ==================================================
+if not IsAndroid:
+    vdf_dir = str(AAPS_LOGS_DIR) + os.sep
+
     
 if IsAndroid :
     import androidhelper

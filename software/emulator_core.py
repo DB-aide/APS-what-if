@@ -9,22 +9,20 @@
 from email.utils import formatdate
 from decimal import Decimal, getcontext
 from datetime import timezone
-import  datetime
-import  os, subprocess, sys
-import  glob
-import  time
-import  json
-import  zipfile
-import  binascii
-import  copy
-import  re
+import datetime
+import os, subprocess, sys
+import glob
+import time
+import json
+import zipfile
+import binascii
+import copy
+import re
 import os
 import json
-
 import determine_basal as detSMB
 from determine_basal import my_ce_file
-from config import DEFAULT_WDIR
-from pathlib import Path
+from config import DEFAULT_WDIR, ENABLE_ANDROID_DETECTION
 
 # Parser debug logging (set to True to enable)
 parser_debug = True
@@ -2691,19 +2689,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
 
     #log_msg('inside all_parameters_known -->\nvarFile='+varFile+'\nvarLabel='+varLabel)#   
     logListe = glob.glob(myseek+myfile, recursive=False)
-    #print ('logListe:', str(logListe))
-    if arg2[:7] == 'Android' :
-        isAndroid = True
-    else:
-        isAndroid = False
-        utf8 = os.getenv('PYTHONUTF8', 'undefined')
-        if utf8 == 'undefined':
-            sub_issue('You need to set the environment variable PYTHONUTF8 first and assign the value 1')
-            return 0, 'UTF8', 0, '', '', 0, ''        # not defined at all
-        if utf8 != '1':
-            sub_issue('Environment variable PYTHONUTF8 has wrong value '+utf8+', must be value 1')
-            return 0, 'UTF8', 0, '', '', 0, ''        # wrong value
-        
+    isAndroid = ENABLE_ANDROID_DETECTION 
+    
     # ---   add sorting info    -----------------------------------
     sorted_fn = {}
     if isAndroid:
@@ -2760,10 +2747,8 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
 
 
     filecount = 0
-    wd = os.path.dirname(varFile)
-    if isAndroid:       wd = wd + '/'
-    elif wd !='':       wd = wd + '/'               # needed for GUI method
-    #if wd == '':        wd = os.getcwd()
+    wd = str(DEFAULT_WDIR.resolve()) + os.sep
+
     for ps in sorted(sorted_fn):
         fn = sorted_fn[ps]
         #print('Try file ['+fn+'] in folder ['+wd+'] of ['+varFile+']')
@@ -2775,7 +2760,6 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
         if useFile:
             isZip = ( ftype == 'zip')
             if filecount == 0 :                     # initalize file loop
-                #wd = os.path.dirname(varFile)
                 if startLabel.find('2000')==0 :
                     fnLabel = os.path.basename(fn)  # only one logfile to scan: use its name
                 else:
@@ -2789,9 +2773,6 @@ def parameters_known(myseek, arg2, variantFile, startLabel, stoppLabel, entries,
                 cel.close()
                 my_ce_file(ce_file)                 # exports name to determine_basal.py
                 fn_first = wd + fnLabel
-                #print('fn_first =', wd + fnLabel)
-                #if how_to_print=='GUI':
-                #    fn_first_used.set(fn)
                 if not isAndroid:        log_msg ('\n')
             cont = scanLogfile(fn, entries)
             #print('returned to parameters_known:', CarbReqGram, 'when:', CarbReqTime)
