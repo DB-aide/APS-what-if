@@ -6,21 +6,21 @@ Dialog updated and folders are correct for all OS versions.
 The config.py file now contains the folder variables.
 And a new file i18n.py with error messages in it.
 
-APS-what-if/
-│
-├── config.py
-├── emulator_batch.py
-│
-├── aapsLogs/			←user pastes .zip logs here
-│   ├── AndroidAPS_....zip
-│
-├── your_working_directory/	←ALL output
-│   ├── *.orig.txt
-│   ├── *.csv
-│   ├── *.log
-│   ├── *.pdf
-│
-└── software/
+APS-what-if/<br>
+│<br>
+├── config.py<br>
+├── emulator_batch.py<br>
+│<br>
+├── aapsLogs/			←user pastes .zip logs here<br>
+│   ├── AndroidAPS_....zip<br>
+│<br>
+├── your_working_directory/	←ALL output<br>
+│   ├── *.orig.txt<br>
+│   ├── *.csv<br>
+│   ├── *.log<br>
+│   ├── *.pdf<br>
+│<br>
+└── software/<br>
 
 
 05.May.2025

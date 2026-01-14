@@ -28,6 +28,9 @@ from config import DEFAULT_WDIR, ENABLE_ANDROID_DETECTION
 parser_debug = True
 parser_debug_file = '/tmp/emulator_parser_debug.log'
 
+# def gui_log(msg, tag=None):
+#     gui_queue.put((msg, tag))
+
 def parser_debug_log(msg: str):
     try:
         with open(parser_debug_file, 'a') as pd:

@@ -1,4 +1,5 @@
 """
+Version 1.0.1 14-01-2026 Made the dialog async (so the GUI doesn't freeze during long emulations)
 Version 1.0.0 12-01-2026 Error handling for the Manage Inputs and Outputs for Emulating AAPS Settings dialog. 
                          If there are no *.zip files yet, a message will be displayed to the user.
                          Dialog updated and folders are correct for all OS versions.
@@ -25,6 +26,58 @@ from emulator_core import get_version_core
 from determine_basal import get_version_determine_basal
 from config import DEFAULT_WDIR, AAPS_LOGS_DIR, DEFAULT_AAPS_ZIP_PATTERN, DEFAULT_ROOT
 from i18n import _ # Error handling for the multilingual dialog.
+import threading
+import queue
+import time
+
+gui_queue = queue.Queue()
+emul_thread = None
+# select the optional start and end date/time     -----------------------------
+ENABLED = '!disabled'
+noStart = '2000-01-01T00:00:00Z'
+noStopp = '2099-12-31T23:59:59Z'
+# bovenin (of net vóór GUI-opbouw)
+logfil_entry = None
+
+def gui_log(msg, tag=None):
+    gui_queue.put((msg, tag))
+
+def process_gui_queue():
+    try:
+        while True:
+            msg, tag = gui_queue.get_nowait()
+            lfd.configure(state='normal')
+            if tag:
+                lfd.insert('end', msg + '\n', tag)
+            else:
+                lfd.insert('end', msg + '\n')
+            lfd.configure(state='disabled')
+            lfd.see('end')
+    except queue.Empty:
+        pass
+
+    root.after(100, process_gui_queue)   # blijf pollen
+
+def emulation_worker():
+    try:
+        gui_log("Starting emulation...")
+        time.sleep(1)
+
+        # === HIER jouw echte emulatie ===
+        for i in range(5):
+            gui_log(f"Processing step {i+1}/5")
+            time.sleep(1)
+
+        gui_log("Emulation finished successfully")
+        runState.set("DONE")
+    except Exception as e:
+        gui_log(f"ERROR: {e}", tag="issue")
+        runState.set("ERROR")
+
+def clear_msg():
+    lfd.configure(state='normal')
+    lfd.delete("1.0", "end")
+    lfd.configure(state='disabled')
 
 def check_aaps_logs_present():
     if not list(AAPS_LOGS_DIR.glob("*.zip")):
@@ -35,64 +88,64 @@ def check_aaps_logs_present():
         return False
     return True
 
+def focus_widget(widget, delay=0):
+    """
+    Safely give keyboard focus to a widget after GUI updates.
+    """
+    if delay == 0:
+        root.after_idle(widget.focus_set)
+    else:
+        root.after(delay, widget.focus_set)
+
+def select_tab_and_focus(tab, widget):
+    """
+    Select a notebook tab and focus a widget inside it.
+    """
+    book.select(tab)
+    focus_widget(widget)
+
+def add_file_selector(
+    parent,
+    row,
+    label_text,
+    text_var,
+    browse_cmd,
+    show_cmd=None,
+    entry_width=None,
+    pady=(10, 2)
+):
+    """
+    Adds a standardized file selector row:
+    Label
+    Entry
+    Browse button
+    Optional Show/Edit button
+    """
+
+    # Label
+    ttk.Label(parent, text=label_text)\
+        .grid(column=0, row=row, columnspan=2, sticky="W", padx=5, pady=pady)
+
+    # Entry
+    ttk.Entry(parent, textvariable=text_var, width=entry_width)\
+        .grid(column=0, row=row + 1, columnspan=2, sticky="EW", padx=5)
+
+    # Browse button
+    ttk.Button(parent, text="Browse", command=browse_cmd)\
+        .grid(column=2, row=row + 1, sticky="EW", padx=5)
+
+    # Optional Show/Edit button
+    if show_cmd:
+        ttk.Button(parent, text="Show", command=show_cmd)\
+            .grid(column=3, row=row + 1, sticky="EW", padx=5)
+
+    return row + 2
+
 def get_version_GUI(echo_msg):
     echo_msg['emulator_GUI.py'] = '2026-01-12 11:40'        # Dialog updated. And folders are correct for all OS versions. The config.py file now contains the folder variables.
     #echo_msg['emulator_GUI.py'] = '2025-07-20 17:04'       # align camelPrint of bestSlope with bestParabola
     #cho_msg['emulator_GUI.py'] = '2024-04-25 16:24'
     return echo_msg
-
-
-#################################################################################
-#   overall layout                                                              #
-#                                                                               #
-#   +----------------------------------------------------------------------+    #
-#   |   ROW 0 / COL 0:  frame for WD definition                            |    #
-#   +----------------------------------------------------------------------+    #
-#   |   ROW 1 / COL 0:  Notebook tabs                                      |    #
-#   |   +-----------------------------------------------------------+      |    #
-#   |   |  Tab1: Inputs     | tab2: Graphics    | tab3: Results     |      |    #
-#   |                                                                      |    #
-#   |                                                                      |    #
-#   |                                                                      |    #
-#   +----------------------------------------------------------------------+    #
-#################################################################################
-root = Tk()
-root.title('Manage Inputs and Outputs for Emulating AAPS Settings')
-root.columnconfigure(0, weight=1)
-root.rowconfigure(2, weight=1)
-ttk.Sizegrip(root).grid(column=999, row=999, sticky=(S,E))
-#root['width']  = 600
-#root['height'] = 500
-
-book = ttk.Notebook(root)
-book.columnconfigure(0, weight=1)
-book.rowconfigure(0, weight=1)
-tStyle = ttk.Style()
-#tStyle.configure('TNotebook')
-tStyle.configure('Bold.TNotebook.Tab', font='bold', padding=[20,0], background='#AAA')
-book['style'] = 'Bold.TNotebook'
-book.grid(column=0, row=2, columnspan=4, sticky='WN', padx=10, pady=20)
-inpframe = ttk.Frame(book, relief='raised')
-outframe = ttk.Frame(book, relief='raised')
-resframe = ttk.Frame(book, relief='raised')
-runframe = ttk.Frame(book, relief='raised')
-book.add(inpframe, text='Select Inputs')
-book.add(outframe, text='Select Graphics Options')
-book.add(runframe, text='Execute the Analysis')
-book.add(resframe, text='Inspect Results')
-
-
-
-#################################################################################
-#   wdframe:                                                                    #
-#################################################################################
-#   select the working directory    ---------------------------------------------
-#wdframe = ttk.Frame(root, padding="3 3 12 12", borderwidth=10, relief='raised')
-wdframe = ttk.Frame(root, padding="3 3 3 12", relief='raised')
-wdframe.grid(column=0, row=0, columnspan=4, sticky='WENS')
-wdframe.columnconfigure(0, weight=1)
-wdframe.columnconfigure(1, weight=1)
-wdir = StringVar()
 
 def get_wdir():
     # always start the directory browser in the default working directory
@@ -148,26 +201,7 @@ def gui_quit():
         root.destroy()
         exit()                                                                  # from tkinter
         sys.exit                                                                # from python
-        
-ttk.Label(wdframe, text="Your working directory").grid(column=0, columnspan=3, row=0, sticky=(W,E), padx=5)
-default_wdir = str(DEFAULT_WDIR)
-wdir.set(default_wdir)
-aaps_logs_dir = str(AAPS_LOGS_DIR)
-default_afil = str(DEFAULT_AAPS_ZIP_PATTERN)
-wdir_entry = ttk.Entry(wdframe, width=100, textvariable=wdir)
-wdir_entry.grid(column=0, columnspan=3, row=1, sticky=(W, E), padx=5)
 
-ttk.Button(wdframe, text="Browse", command=get_wdir).grid(column=3, row=1, sticky=(W,E), padx=10)
-ttk.Button(wdframe, text="Reset All", command=reset_all).grid(column=4, row=1, sticky=(W,E), padx=5)
-tStyle.configure('Exit.TButton', foreground='red')
-ttk.Button(wdframe, text="Quit",   command=gui_quit, style='Exit.TButton').grid(column=5, row=1, sticky=(W,E), padx=10)
-# same as QUIT button so matplotlib is closed, too:
-root.protocol("WM_DELETE_WINDOW", gui_quit)
-
-#################################################################################
-#   inpframe:                                                                   #
-#################################################################################
-#   select the variant definition file  -----------------------------------------
 def get_vfil():
     newvf = filedialog.askopenfilename(filetypes={'Variation {.vdf .dat}'}, initialdir=DEFAULT_ROOT)
     if newvf != "":
@@ -176,23 +210,6 @@ def get_vfil():
 def edit_vfil():
     oldvf = vfil.get()
     open_file(oldvf)
-
-inpframe.columnconfigure(0, weight=1)
-inpframe.columnconfigure(1, weight=1)
-vfilRow = 3
-ttk.Label(inpframe, text="\nYour variant definition file").grid(column=0, columnspan=2, row=vfilRow-1, sticky=(W), padx=5)
-vfil = StringVar()
-try:
-    demo_path = DEFAULT_ROOT + os.sep + 'Demo_Sports_Adaptations.vdf'
-except Exception:
-    demo_path = os.path.join(os.getcwd(), 'Demo_Sports_Adaptations.vdf')
-if os.path.exists(demo_path):
-    vfil.set(demo_path)
-vfil_entry = ttk.Entry(inpframe, width=100, textvariable=vfil)
-vfil_entry.grid(column=0, columnspan=2, row=vfilRow, sticky=(W,E), padx=5)
-
-ttk.Button(inpframe, text="Browse", command=get_vfil).grid( column=2, row=vfilRow, sticky=(W, E), padx=10)
-ttk.Button(inpframe, text="Edit",   command=edit_vfil).grid(column=3, row=vfilRow, sticky=(W, E), padx=10)
 
 #   select the AAPS logfile(s)  -------------------------------------------------
 def get_afil():
@@ -220,21 +237,6 @@ def show_afil():
         msg +="\nTotal match count: " + str(filecount)
     messagebox.showinfo(message=msg, title="List matching logfiles", icon="info")
 
-afilRow = 5
-ttk.Label(inpframe, text="\nYour AAPS logfile(s)").grid(column=0, columnspan=2, row=afilRow-1, sticky=(E), padx=5)
-afil = StringVar()
-if 'default_afil' in globals() and default_afil:
-    afil.set(default_afil)
-afil_entry = ttk.Entry(inpframe, width=100, textvariable=afil, justify='right')
-afil_entry.grid(column=0, columnspan=2, row=afilRow, sticky=(W,E), padx=5)
-
-ttk.Button(inpframe, text="Browse", command=get_afil).grid( column=2, row=afilRow, sticky=(W, E), padx=10)
-ttk.Button(inpframe, text="Show matches", command=show_afil).grid( column=3, row=afilRow, sticky=(W, E), padx=10)
-
-
-# select the optional start and end date/time     -----------------------------
-ENABLED = '!disabled'
-
 def stmpStartChanged():
     if stmpStart.get() == 'yes':
         tstart_entry.state([ENABLED])
@@ -249,36 +251,176 @@ def stmpStoppChanged():
         tstopp_entry.state([ENABLED])
     else:
         tstopp_entry.state(['disabled'])
-    
-tstartRow = 10
-noStart = '2000-01-01T00:00:00Z'
-noStopp = '2099-12-31T23:59:59Z'
-ttk.Label(inpframe, text="\nexample date/time format ...   2019-11-06T12:30:00Z   ").grid(column=1, row=tstartRow-1, sticky=(E), padx=5)
 
-stmpStart = StringVar()
-stmpStart.set('yes')                                                             # was in tri-state
-chkStart  = ttk.Checkbutton(inpframe, text='  Use start time by entering UTC date/time', \
-            command=stmpStartChanged, variable=stmpStart, onvalue='yes', offvalue='no')
-chkStart.grid(column=0, row=tstartRow, sticky=(W), padx=5)
-tstart = StringVar()
+#################################################################################
+#   overall layout                                                              #
+#                                                                               #
+#   +----------------------------------------------------------------------+    #
+#   |   ROW 0 / COL 0:  frame for WD definition                            |    #
+#   +----------------------------------------------------------------------+    #
+#   |   ROW 1 / COL 0:  Notebook tabs                                      |    #
+#   |   +-----------------------------------------------------------+      |    #
+#   |   |  Tab1: Inputs     | tab2: Graphics    | tab3: Results     |      |    #
+#   |                                                                      |    #
+#   |                                                                      |    #
+#   |                                                                      |    #
+#   +----------------------------------------------------------------------+    #
+#################################################################################
+root = Tk()
+root.title('Manage Inputs and Outputs for Emulating AAPS Settings')
+root.columnconfigure(0, weight=1)
+root.rowconfigure(2, weight=1)
+ttk.Sizegrip(root).grid(column=999, row=999, sticky=(S,E))
+
+book = ttk.Notebook(root)
+book.columnconfigure(0, weight=1)
+book.rowconfigure(0, weight=1)
+tStyle = ttk.Style()
+tStyle.configure(
+    'Bold.TNotebook.Tab',
+    font=('TkDefaultFont', 10, 'bold'),
+    padding=[5, 5]
+)
+
+book['style'] = 'Bold.TNotebook'
+book.grid(column=0, row=2, columnspan=4, sticky='NSEW', padx=10, pady=20)
+root.grid_columnconfigure(0, weight=1)
+root.grid_rowconfigure(2, weight=1)
+
+inpframe = ttk.Frame(book, relief='raised')
+outframe = ttk.Frame(book, relief='raised')
+resframe = ttk.Frame(book, relief='raised')
+runframe = ttk.Frame(book, relief='raised')
+
+for frame in (inpframe, outframe, runframe, resframe):
+    frame.grid_columnconfigure(0, weight=1)
+
+book.add(inpframe, text='Select Inputs')
+book.add(outframe, text='Select Graphics Options')
+book.add(runframe, text='Execute the Analysis')
+book.add(resframe, text='Inspect Results')
+process_gui_queue()
+
+#################################################################################
+#   wdframe:                                                                    #
+#################################################################################
+#   select the working directory    ---------------------------------------------
+
+wdframe = ttk.Frame(root, padding="3 3 3 12", relief='raised')
+wdframe.grid(column=0, row=0, columnspan=4, sticky='WENS')
+wdir = StringVar()
+        
+ttk.Label(wdframe, text="Your working directory").grid(column=0, columnspan=3, row=0, sticky=(W,E), padx=5)
+default_wdir = str(DEFAULT_WDIR)
+wdir.set(default_wdir)
+aaps_logs_dir = str(AAPS_LOGS_DIR)
+default_afil = str(DEFAULT_AAPS_ZIP_PATTERN)
+wdir_entry = ttk.Entry(wdframe, width=100, textvariable=wdir)
+wdir_entry.grid(column=0, columnspan=3, row=1, sticky=(W, E), padx=5)
+
+ttk.Button(wdframe, text="Browse", command=get_wdir).grid(column=3, row=1, sticky=(W,E), padx=10)
+ttk.Button(wdframe, text="Reset All", command=reset_all).grid(column=4, row=1, sticky=(W,E), padx=5)
+tStyle.configure('Exit.TButton', foreground='red')
+ttk.Button(wdframe, text="Quit",   command=gui_quit, style='Exit.TButton').grid(column=5, row=1, sticky=(W,E), padx=10)
+# same as QUIT button so matplotlib is closed, too:
+root.protocol("WM_DELETE_WINDOW", gui_quit)
+
+#################################################################################
+#   inpframe:                                                                   #
+#################################################################################
+#   select the variant definition file  -----------------------------------------
+
+# -------------------------------------------------
+# Grid setup (1x!)
+# -------------------------------------------------
+for c in range(4):
+    inpframe.columnconfigure(c, weight=1)
+
+row = 0
+
+# -------------------------------------------------
+# Variant definition file
+# -------------------------------------------------
+vfil = StringVar()
+demo_path = os.path.join(DEFAULT_ROOT, 'Demo_Sports_Adaptations.vdf')
+if os.path.exists(demo_path):
+    vfil.set(demo_path)
+
+row = add_file_selector(
+    parent=inpframe,
+    row=row,
+    label_text="Your variant definition file",
+    text_var=vfil,
+    browse_cmd=get_vfil,
+    show_cmd=edit_vfil
+)
+
+# -------------------------------------------------
+# AAPS logfile(s)
+# -------------------------------------------------
+afil = StringVar()
+if 'default_afil' in globals() and default_afil:
+    afil.set(default_afil)
+
+row = add_file_selector(
+    parent=inpframe,
+    row=row,
+    label_text="Your AAPS logfile(s)",
+    text_var=afil,
+    browse_cmd=get_afil,
+    show_cmd=show_afil
+)
+
+# -------------------------------------------------
+# Start / Stop time selection
+# -------------------------------------------------
+ttk.Label(
+    inpframe,
+    text="example date/time format ...   2019-11-06T12:30:00Z"
+).grid(column=1, row=row, sticky="E", padx=5, pady=(15, 2))
+
+row += 1
+
+stmpStart = StringVar(value='yes')
+chkStart = ttk.Checkbutton(
+    inpframe,
+    text='Use start time by entering UTC date/time',
+    command=stmpStartChanged,
+    variable=stmpStart,
+    onvalue='yes',
+    offvalue='no'
+)
+chkStart.grid(column=0, row=row, sticky="W", padx=5)
+
+tstart = StringVar(value=noStart)
 tstart_entry = ttk.Entry(inpframe, width=20, textvariable=tstart)
-tstart_entry.grid(column=1, row=tstartRow, sticky=(E), padx=5, pady=0)
-tstart.set(noStart)
+tstart_entry.grid(column=1, row=row, sticky="E", padx=5)
 
-stmpStopp = StringVar()
-stmpStopp.set('yes')                                                             # was in tri-state
-tstopp = StringVar()
+row += 1
+
+stmpStopp = StringVar(value='yes')
+chkStopp = ttk.Checkbutton(
+    inpframe,
+    text='Use final time by entering UTC date/time',
+    command=stmpStoppChanged,
+    variable=stmpStopp,
+    onvalue='yes',
+    offvalue='no'
+)
+chkStopp.grid(column=0, row=row, sticky="W", padx=5)
+
+tstopp = StringVar(value=noStopp)
 tstopp_entry = ttk.Entry(inpframe, width=20, textvariable=tstopp)
-tstopp_entry.grid(column=1, row=tstartRow+1, sticky=(E), padx=5, pady=5)
-tstopp_entry.state(['!disabled'])
-chkStopp  = ttk.Checkbutton(inpframe, text='  Use final time by entering UTC date/time', \
-            command=stmpStoppChanged, variable=stmpStopp, onvalue='yes', offvalue='no')
-chkStopp.grid(column=0, row=tstartRow+1, sticky=(W), padx=5)
-tstopp_entry.state(['!disabled'])
-tstopp.set(noStopp)
-# initialize start/stop entry states according to variables
+tstopp_entry.grid(column=1, row=row, sticky="E", padx=5)
+
+# initial states
 stmpStartChanged()
 stmpStoppChanged()
+
+# -------------------------------------------------
+# Keep everything at the top
+# -------------------------------------------------
+inpframe.grid_rowconfigure(row + 1, weight=1)
 
 
 #################################################################################
@@ -730,53 +872,76 @@ def edit_pdffil():
             sub_issue(ele[:-1])                                                 # sub appends <CR>
         sub_issue(str(sys.exc_info()[1]))
 
-resframe.columnconfigure(0, weight=1)
-resframe.columnconfigure(1, weight=1)
-resframe.columnconfigure(2, weight=1)
-rfilRow = 1
+book.grid(column=0, row=2, columnspan=4, sticky="NSEW", padx=10, pady=20)
+root.grid_rowconfigure(2, weight=1)
+root.grid_columnconfigure(0, weight=1)
 
-ttk.Label(resframe, text="\n*.log - Your file showing edits from the variant assignments").grid(column=0, columnspan=2, row=rfilRow-1, sticky=(W), padx=5)
+row =0
+
+def add_file_row(frame, label_text, var, browse_cmd, show_cmd, row):
+    ttk.Label(frame, text=label_text).grid(
+        column=0, columnspan=2, row=row, sticky=W, padx=5, pady=(10, 2)
+    )
+    ttk.Entry(frame, width=130, textvariable=var).grid(
+        column=0, columnspan=3, row=row+1, sticky=(W, E), padx=5
+    )
+    ttk.Button(frame, text="Browse", command=browse_cmd).grid(
+        column=3, row=row+1, sticky=W, padx=10
+    )
+    ttk.Button(frame, text="Show", command=show_cmd).grid(
+        column=4, row=row+1, sticky=W, padx=10
+    )
+    return row + 2
+
+
 logfil = StringVar()
-logfil_entry = ttk.Entry(resframe, width=130, textvariable=logfil)              #, justify='right')
-logfil_entry.grid(column=0, columnspan=3, row=rfilRow, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_logfil).grid( column=3, row=rfilRow, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_logfil).grid(column=4, row=rfilRow, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.log - Your file showing edits from the variant assignments",
+    logfil, get_logfil, edit_logfil, row
+)
 
-ttk.Label(resframe, text="\n*.csv - Your table comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+1, sticky=(W), padx=5)
 tabfil = StringVar()
-tabfil_entry = ttk.Entry(resframe, width=130, textvariable=tabfil)              #, justify='right')
-tabfil_entry.grid(column=0, columnspan=3, row=rfilRow+2, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_tabfil).grid( column=3, row=rfilRow+2, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_tabfil).grid(column=4, row=rfilRow+2, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.csv - Your table comparing key values of original vs emulation",
+    tabfil, get_tabfil, edit_tabfil, row
+)
 
-ttk.Label(resframe, text="\n*.delta - Your table comparing bg deltas of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+3, sticky=(W), padx=5)
 deltafil = StringVar()
-deltafil_entry = ttk.Entry(resframe, width=130, textvariable=deltafil)            #, justify='right')
-deltafil_entry.grid(column=0, columnspan=3, row=rfilRow+4, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_deltafil).grid( column=3, row=rfilRow+4, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_deltafil).grid(column=4, row=rfilRow+4, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.delta - Your table comparing bg deltas of original vs emulation",
+    deltafil, get_deltafil, edit_deltafil, row
+)
 
-ttk.Label(resframe, text="\n*.orig.txt - Your short log of original analysis").grid(column=0, columnspan=2, row=rfilRow+5, sticky=(W), padx=5)
 txtorig = StringVar()
-txtorig_entry = ttk.Entry(resframe, width=130, textvariable=txtorig)              #, justify='right')
-txtorig_entry.grid(column=0, columnspan=3, row=rfilRow+6, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_txtorig).grid( column=3, row=rfilRow+6, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_txtorig).grid(column=4, row=rfilRow+6, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.orig.txt - Your short log of original analysis",
+    txtorig, get_txtorig, edit_txtorig, row
+)
 
-ttk.Label(resframe, text="\n*.txt - Your short log of emulated analysis").grid(column=0, columnspan=2, row=rfilRow+7, sticky=(W), padx=5)
 txtemul = StringVar()
-txtemul_entry = ttk.Entry(resframe, width=130, textvariable=txtemul)              #, justify='right')
-txtemul_entry.grid(column=0, columnspan=3, row=rfilRow+8, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_txtemul).grid( column=3, row=rfilRow+8, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_txtemul).grid(column=4, row=rfilRow+8, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.txt - Your short log of emulated analysis",
+    txtemul, get_txtemul, edit_txtemul, row
+)
 
-ttk.Label(resframe, text="\n*.pdf etc. - Your graphic file comparing key values of original vs emulation").grid(column=0, columnspan=2, row=rfilRow+9, sticky=(W), padx=5)
 pdffil = StringVar()
-pdffil_entry = ttk.Entry(resframe, width=130, textvariable=pdffil)              #, justify='right')
-pdffil_entry.grid(column=0, columnspan=3, row=rfilRow+10, sticky=(W,E), padx=5)
-ttk.Button(resframe, text="Browse", command=get_pdffil).grid( column=3, row=rfilRow+10, sticky=(W, E), padx=10)
-ttk.Button(resframe, text="Show",   command=edit_pdffil).grid(column=4, row=rfilRow+10, sticky=(W, E), padx=10)
+row = add_file_row(
+    resframe,
+    "*.pdf etc. - Your graphic file comparing key values of original vs emulation",
+    pdffil, get_pdffil, edit_pdffil, row
+)
 
+# all rows without weight
+for r in range(row):
+    resframe.grid_rowconfigure(r, weight=0)
+
+# one empty row UNDER everything
+resframe.grid_rowconfigure(row, weight=1)
 
 
 #################################################################################
@@ -799,18 +964,30 @@ def echo_version(mdl):
 
 def sub_emul():
     global runState, varyHome
+    global emul_thread
+    global echo_msg
+
+    if emul_thread and emul_thread.is_alive():
+        messagebox.showinfo("Emulation running", "Emulation is already running.")
+        return
+    
     if not check_aaps_logs_present():
         return
+    
     runState.set('Checking inputs ...   ')
-    # varyHome= sys.argv[0]                           # command used to start this script
-    # whereColon = varyHome.find(':')
-    # if whereColon < 0:
-    #     varyHome = os.getcwd()
-    # varyHome = os.path.dirname(varyHome) + os.sep   #'\\'
     varyHome = DEFAULT_ROOT + os.sep
+    gui_log("=" * 60)
+    gui_log("Starting new emulation run")
+
+    emul_thread = threading.Thread(
+        target=emulation_worker,
+        daemon=True
+    )
+    emul_thread.start()
+    
     m  = '='*66+'\nEcho of software versions used\n'+'-'*66
     m +='\n vary_settings home directory  ' + varyHome
-    global echo_msg
+    
     echo_msg = {}
     echo_msg = get_version_GUI(echo_msg)
     echo_msg = get_version_core(echo_msg)
@@ -832,7 +1009,7 @@ def sub_emul():
         sub_issue('graphics output options are missing')
         incomplete = True
     m += '\nOutput options        ' + gopt
-    gopt = sys.platform + "/" + gopt                                        # i.e. not in Android
+    gopt = sys.platform + os.sep + gopt                                        # i.e. not in Android
     #m_default = ''
     #if gopt.find('.') >= 0 :
     #    my_decimal = '.'
@@ -876,7 +1053,9 @@ def sub_emul():
         if not check_aaps_logs_present():
             return
         runState.set('Emulation started ...')
-        runframe.update()                                                       # update frame display
+        # runframe.update()                                                       # update frame display
+        select_tab_and_focus(runframe, lfd)
+
         #kick_off(afil.get(), gopt, variant, useStart, useStopp)
         entries = {}
         # _, thisTime, extraSMB, CarbReqGram, CarbReqTime, lastCOB, fn_first = parameters_known(afil.get(), gopt, vfil.get(), useStart, useStopp, entries, m, my_decimal)
@@ -918,21 +1097,20 @@ def sub_emul():
             for fn in log_liste:
                 ftype = fn[len(fn)-3:]
 
-                if ftype=='zip' or ftype.find(".")>=0:
-                    logfil.set(fn_first+'.'+variant[:-4]+'.log')
-                    tabfil.set(fn_first+'.'+variant[:-4]+'.csv')
-                    deltafil.set(fn_first+'.'+variant[:-4]+'.delta')
-                    txtorig.set(fn_first+'.' + 'orig' +  '.txt')
-                    txtemul.set(fn_first+'.'+variant[:-4]+'.txt')
-                    pdffil.set(fn_first+'.'+variant[:-4]+'.pdf')
-                    resframe.focus()
-                    book.select(3)                                              # activate result tab
-                    logfil_entry.focus()                                        # activate as initial input box
-                    break                                                       # use name from 1st match
-        runframe.update()                                                       # update frame display
-                
+        for fn in log_liste:
+            ftype = fn[-3:]
+
+            if ftype == 'zip' or '.' in ftype:
+                logfil.set(fn_first + '.' + variant[:-4] + '.log')
+                tabfil.set(fn_first + '.' + variant[:-4] + '.csv')
+                deltafil.set(fn_first + '.' + variant[:-4] + '.delta')
+                txtorig.set(fn_first + '.orig.txt')
+                txtemul.set(fn_first + '.' + variant[:-4] + '.txt')
+                pdffil.set(fn_first + '.' + variant[:-4] + '.pdf')
+                root.after(0, lambda: select_tab_and_focus(resframe, logfil_entry))
+                break
+
     except:                                                                     # catch *all* exceptions
-        #e = sys.exc_info()[0]
         tb = sys.exc_info()[2]
         sub_issue("Problem in emulator_core.py")
         for ele in traceback.format_tb(tb):
@@ -940,33 +1118,81 @@ def sub_emul():
         sub_issue(str(sys.exc_info()[1]))
         runState.set('Emulation broken ...  ')
         ttk.Label(runframe, textvariable=runState, style='Error.TLabel').grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-    runframe.update()                                                           # update frame display
+    # runframe.update()                                                           # update frame display
+        select_tab_and_focus(runframe, lfd)
+
     #log_msg("End of sub_emul reached")
     pass
 
 runRow = 1
-runframe.columnconfigure(0, weight=1)
-runframe.rowconfigure(runRow+1, weight=1)
 
-ttk.Label(runframe, text="Messages from Emulation").grid(column=0, row=runRow, sticky=(W), padx=5, pady=10)
-ttk.Button(runframe, text="Run Emulation", command=sub_emul).grid( column=1, row=runRow, sticky=(E), padx=20, pady=5)
+# --- Grid config ---
+for c in range(3):
+    runframe.columnconfigure(c, weight=1)
+
+runframe.rowconfigure(runRow + 1, weight=1)   # Text groeit verticaal
+
+# --- Header row ---
+ttk.Label(
+    runframe,
+    text="Messages from Emulation"
+).grid(column=0, row=runRow, sticky="W", padx=5, pady=10)
+
+ttk.Button(
+    runframe,
+    text="Run Emulation",
+    command=sub_emul
+).grid(column=1, row=runRow, sticky="E", padx=20, pady=5)
+
 runState = StringVar()
-notRunning ='                                   '                               # in prop. font as long as running
-runState.set(notRunning)
+runState.set("")
+
 tStyle.configure('Done.TLabel', foreground='green')
 tStyle.configure('Error.TLabel', foreground='red')
-ttk.Label(runframe, textvariable=runState).grid(column=2, row=runRow, sticky=(W), padx=20, pady=10)
-lfd = Text(runframe, state='disabled', width=146, height=30)                    # w/h in characters
-lfd.grid(column=0, row=runRow+1, columnspan=3)
-lfd['wrap'] = 'none'
+
+ttk.Label(
+    runframe,
+    textvariable=runState
+).grid(column=2, row=runRow, sticky="W", padx=20)
+
+# --- Text output (dynamic) ---
+lfd = Text(
+    runframe,
+    state='disabled',
+    wrap='none'
+)
+
+lfd.grid(
+    column=0,
+    row=runRow + 1,
+    columnspan=3,
+    sticky="NSEW",
+    padx=5,
+    pady=5
+)
+
 lfd.tag_configure('issue', foreground='red')
+
+# --- Scrollbars ---
 scrly = ttk.Scrollbar(runframe, orient=VERTICAL, command=lfd.yview)
-scrly.grid(column=3, row=runRow+1, sticky=(W,N,S))
+scrly.grid(column=3, row=runRow + 1, sticky="NS")
+
 lfd['yscrollcommand'] = scrly.set
+
 scrlx = ttk.Scrollbar(runframe, orient=HORIZONTAL, command=lfd.xview)
-scrlx.grid(column=0, columnspan=5, row=runRow+2, sticky=(W,E,N))
+scrlx.grid(column=0, columnspan=3, row=runRow + 2, sticky="EW")
+
 lfd['xscrollcommand'] = scrlx.set
-ttk.Button(runframe, text="Clear Messages", command=clear_msg).grid( column=0, row=runRow+0, sticky=(E), padx=20, pady=5)
+
+# --- Clear button ---
+ttk.Button(
+    runframe,
+    text="Clear Messages",
+    command=clear_msg
+).grid(column=0, row=runRow, sticky="E", padx=20)
+
+
+ttk.Progressbar(runframe, mode='indeterminate').start(10)
 
 how_to_print = 'GUI'
 #how_to_print = 'print'                                                         # goes to DOS window; for debugging
